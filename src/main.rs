@@ -1,7 +1,8 @@
 use std::{
     net::TcpListener,
     io::{Write, BufRead, BufReader},
-    fs
+    fs,
+    collections::HashSet,
 };
 
 fn main() {
@@ -16,39 +17,30 @@ fn main() {
         
         let mut tokens = line.split_whitespace();
         if tokens.next().unwrap() == "GET" {
-            let file = tokens.next().unwrap();
-            println!("{}", file);
-            match file{
-                "/" => {
-                    let confirmation = "HTTP/1.1 200 OK";
-                    let content = fs::read_to_string("index.html").expect("failed to read file");
-                    let length = content.len();
+            let mut requested_file = tokens.next().unwrap();
+            let valid_locations: HashSet<String> = HashSet::from(["/".to_string(), "/style.css".to_string(), "/script.js".to_string()]);
+            if valid_locations.contains(requested_file) {
+                if requested_file == "/" {
+                    requested_file = "/index.html";
+                }
+                let file_name = &requested_file[1..requested_file.len()];
 
-                    let response = format!("{confirmation}\r\nContent-Type: text/html\r\nContent-Length: {length}\r\n\r\n{content}");
-                    let _ = stream.write(&response.into_bytes());
-                }
-                "/style.css" => {
-                    let confirmation = "HTTP/1.1 200 OK";
-                    let content = fs::read_to_string("style.css").expect("failed to read file");
-                    let length = content.len();
+                let confirmation = "HTTP/1.1 200 OK";
+                let extension = &file_name.split(".").last().unwrap();
+                let content = fs::read_to_string(file_name).expect("failed to read file");
+                let length = content.len();
 
-                    let response = format!("{confirmation}\r\nContent-Type: text/css\r\nContent-Length: {length}\r\n\r\n{content}");
-                    let _ = stream.write(&response.into_bytes());
-                }
-                "/script.js" => {
-                    let confirmation = "HTTP/1.1 200 OK";
-                    let content = fs::read_to_string("script.js").expect("failed to read file");
-                    let length = content.len();
+                let response = format!("{confirmation}\r\nContent-Type: text/{extension}\r\nContent-Length: {length}\r\n\r\n{content}");
 
-                    let response = format!("{confirmation}\r\nContent-Type: text/js\r\nContent-Length: {length}\r\n\r\n{content}");
-                    let _ = stream.write(&response.into_bytes());
-                }
-                _ => {
-                    let error = "HTTP/1.1 404 NOT FOUND";
-                    let content = fs::read_to_string("404.html").expect("failed to read file");
-                    let response = format!("{error}\r\nContent-Type: text/html\r\nContent-Length: {0}\r\n\r\n{content}", content.len());
-                    let _ = stream.write(&response.into_bytes());
-                }
+                let _ = stream.write(&response.into_bytes());
+            } else {
+                let confirmation = "HTTP/1.1 404 NOT FOUND";
+                let content = fs::read_to_string("404.html").expect("failed to read file");
+                let length = content.len();
+
+                let response = format!("{confirmation}\r\nContent-Type: text/html\r\nContent-Length: {length}\r\n\r\n{content}");
+
+                let _ = stream.write(&response.into_bytes());
             }
         }
     }
